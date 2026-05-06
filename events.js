@@ -2,7 +2,7 @@
 // IMPERIUS RPG — EVENTOS, RANKING, MISSÕES
 // ============================================================
 const { getJogador, salvarJogador, adicionarXP, adicionarMoedas, adicionarConquista, adicionarTitulo, getRanking, getConfig, setConfig, todosJogadores } = require('./db');
-const { CONQUISTAS, TITULOS } = require('../data/gameData');
+const { CONQUISTAS, TITULOS } = require('./gameData');
 
 function verRanking() {
   const top = getRanking();
