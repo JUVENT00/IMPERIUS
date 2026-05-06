@@ -8,15 +8,15 @@ const path = require('path');
 const fs = require('fs');
 
 // ── SISTEMAS ──────────────────────────────────────────────
-const db = require('./systems/db');
-const { menuClasses, getClasseKey, girarRoleta, gerarFicha, verClasse, viajar, verMapa, verRegioes } = require('./systems/character');
-const { batalharMonstro, batalharBoss, pvp, usarHabilidade, usarUltimate, rolarD20, rand } = require('./systems/combat');
-const { renascer, reviverPorNecromante, aprovarAcaoServo, registrarAcaoServo, liberarServo } = require('./systems/death');
-const { verLoja, comprarItem, usarItem, equiparArma, verInventario, verBanco, depositar, sacar } = require('./systems/economy');
-const { verRanking, verConquistas, verTitulos, usarTitulo, verMissoes, matarJogador, darItem, abencoarJogador, maldicionarJogador, eventoGlobal, statusBot } = require('./systems/events');
-const { criarSacrificio, aceitarSacrificio, recusarSacrificio, pedirSacrificioParceiro, aceitarMorteSacrificio, recusarMorteSacrificio, verSacrificiosPendentes } = require('./systems/sacrifice');
-const { encarnar, ascender, processarMorteEncarnacao, isEncarnacao, getEncarnacaoAtiva } = require('./systems/incarnation');
-const { CLASSES, CLASSES_NORMAIS, ARMAS } = require('./data/gameData');
+const db = require('./db');
+const { menuClasses, getClasseKey, girarRoleta, gerarFicha, verClasse, viajar, verMapa, verRegioes } = require('./character');
+const { batalharMonstro, batalharBoss, pvp, usarHabilidade, usarUltimate, rolarD20, rand } = require('./combat');
+const { renascer, reviverPorNecromante, aprovarAcaoServo, registrarAcaoServo, liberarServo } = require('./death');
+const { verLoja, comprarItem, usarItem, equiparArma, verInventario, verBanco, depositar, sacar } = require('./economy');
+const { verRanking, verConquistas, verTitulos, usarTitulo, verMissoes, matarJogador, darItem, abencoarJogador, maldicionarJogador, eventoGlobal, statusBot } = require('./events');
+const { criarSacrificio, aceitarSacrificio, recusarSacrificio, pedirSacrificioParceiro, aceitarMorteSacrificio, recusarMorteSacrificio, verSacrificiosPendentes } = require('./sacrifice');
+const { encarnar, ascender, processarMorteEncarnacao, isEncarnacao, getEncarnacaoAtiva } = require('./incarnation');
+const { CLASSES, CLASSES_NORMAIS, ARMAS } = require('./gameData');
 
 // ── CONFIGURAÇÃO ──────────────────────────────────────────
 const DONO_ID = process.env.DONO_ID || '5511999999999@s.whatsapp.net'; // Trocar pelo seu número
