@@ -2,7 +2,7 @@
 // IMPERIUS RPG — MORTE E RESSURREIÇÃO
 // ============================================================
 const { getJogador, salvarJogador, adicionarConquista, adicionarTitulo, getPendente, setPendente, deletePendente } = require('./db');
-const { CLASSES } = require('../data/gameData');
+const { CLASSES } = require('./gameData');
 
 function renascer(jogador_id) {
   const jogador = getJogador(jogador_id);
