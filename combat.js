@@ -2,7 +2,7 @@
 // IMPERIUS RPG — SISTEMA DE COMBATE
 // ============================================================
 const { getJogador, salvarJogador, adicionarXP, adicionarMoedas, adicionarConquista, adicionarTitulo } = require('./db');
-const { CLASSES, REGIOES, ARMAS, MONSTROS_HP, MONSTROS_DANO } = require('../data/gameData');
+const { CLASSES, REGIOES, ARMAS, MONSTROS_HP, MONSTROS_DANO } = require('./gameData');
 const { processarMorteEncarnacao, isEncarnacao } = require('./incarnation');
 
 function rolarD20() { return Math.floor(Math.random() * 20) + 1; }
