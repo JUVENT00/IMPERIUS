@@ -81,7 +81,7 @@ async function conectar() {
     const numero = '556796847913';
     const codigo = await sock.requestPairingCode(numero);
     console.log(`🔑 SEU CÓDIGO DE PAREAMENTO: ${codigo}`);
-  }, 3000);
+  }, 10000);
   }
 
   sock.ev.on('connection.update', async ({ connection, lastDisconnect }) => {
