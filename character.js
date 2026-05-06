@@ -2,8 +2,7 @@
 // IMPERIUS RPG — PERSONAGEM, CLASSES E ROLETA
 // ============================================================
 const { criarJogador, getJogador, salvarJogador, adicionarConquista, adicionarTitulo } = require('./db');
-const { CLASSES, CLASSES_NORMAIS, CLASSES_RARAS, REGIOES, ARMAS, TITULOS } = require('../data/gameData');
-
+const { CLASSES, CLASSES_NORMAIS, CLASSES_RARAS, REGIOES, ARMAS, TITULOS } = require('./gameData');
 // ── MENU DE CLASSES ────────────────────────────────────────
 function menuClasses() {
   let texto = `⚔️ *IMPERIUS RPG* ⚔️\n━━━━━━━━━━━━━━━━━━━━\n\n🌟 *BEM-VINDO, AVENTUREIRO!*\n_Antes de entrar neste mundo..._\n_você precisa escolher seu destino._\n\n━━━━━━━━━━━━━━━━━━━━\n\n🎭 *ESCOLHA SUA CLASSE:*\n\n`;
