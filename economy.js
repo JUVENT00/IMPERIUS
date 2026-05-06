@@ -2,7 +2,7 @@
 // IMPERIUS RPG — ECONOMIA
 // ============================================================
 const { getJogador, salvarJogador, adicionarMoedas, adicionarXP, adicionarConquista } = require('./db');
-const { ITENS_LOJA, ARMAS } = require('../data/gameData');
+const { ITENS_LOJA, ARMAS } = require('./gameData');
 
 function verLoja() {
   let texto = `🛒 *LOJA DE VALDRIS* 🛒\n━━━━━━━━━━━━━━━━━━━━\n\n`;
