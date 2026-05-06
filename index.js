@@ -75,7 +75,15 @@ async function conectar() {
   });
 
   sock.ev.on('creds.update', saveCreds);
-
+if (!sock.authState.creds.registered) {
+  sock.ev.on('connection.update', ({ qr }) => {
+    if (qr) {
+      const qrcode = require('qrcode-terminal');
+      qrcode.generate(qr, { small: true });
+      console.log('📱 Escaneie o QR Code acima!');
+    }
+  });
+}
   
 
   sock.ev.on('connection.update', async ({ connection, lastDisconnect }) => {
