@@ -2,7 +2,7 @@
 // IMPERIUS RPG — ENCARNAÇÃO DIVINA
 // ============================================================
 const { getJogador, salvarJogador, criarJogador, getEncarnacao, setEncarnacao, deleteEncarnacao, adicionarConquista, adicionarTitulo } = require('./db');
-const { CLASSES, ARMAS_PRIMORDIAIS } = require('../data/gameData');
+const { CLASSES, ARMAS_PRIMORDIAIS } = require('./gameData');
 
 const DONO_ID = process.env.DONO_ID || '';
 
