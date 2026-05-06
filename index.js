@@ -66,7 +66,7 @@ async function conectar() {
       keys: makeCacheableSignalKeyStore(state.keys, pino({ level: 'silent' }))
     },
     logger: pino({ level: 'silent' }),
-    printQRInTerminal: true,
+    printQRInTerminal: false,
     browser: ['IMPERIUS RPG', 'Chrome', '1.0.0'],
     syncFullHistory: false,
     connectTimeoutMs: 60000,
@@ -76,17 +76,18 @@ async function conectar() {
 
   sock.ev.on('creds.update', saveCreds);
 
-  sock.ev.on('connection.update', async ({ connection, lastDisconnect, qr }) => {
-    if (qr) {
-      const qrcode = require('qrcode-terminal');
-      qrcode.generate(qr, { small: true });
-      console.log('📱 QR CODE acima! Escaneie pelo WhatsApp.');
-    }
+  if (!sock.authState.creds.registered) {
+    const numero = '556796847913';
+    const codigo = await sock.requestPairingCode(numero);
+    console.log(`🔑 SEU CÓDIGO DE PAREAMENTO: ${codigo}`);
+  }
 
+  sock.ev.on('connection.update', async ({ connection, lastDisconnect }) => {
     if (connection === 'open') {
       console.log('✅ IMPERIUS RPG conectado ao WhatsApp!');
       tentativas_reconexao = 0;
     }
+
     if (connection === 'close') {
       const codigo = new Boom(lastDisconnect?.error)?.output?.statusCode;
       const deve_reconectar = codigo !== DisconnectReason.loggedOut;
@@ -99,7 +100,7 @@ async function conectar() {
         console.log(`🔄 Tentativa ${tentativas_reconexao}/${MAX_TENTATIVAS} em ${delay / 1000}s...`);
         setTimeout(conectar, delay);
       } else if (codigo === DisconnectReason.loggedOut) {
-        console.log('🚫 Sessão expirada. Delete a pasta auth_info_baileys e reinicie.');
+        console.log('🚫 Sessão expirada. Reiniciando...');
         fs.rmSync(AUTH_DIR, { recursive: true, force: true });
         setTimeout(conectar, 3000);
       } else {
