@@ -144,10 +144,6 @@ async function conectar() {
     }
   });
 }
-      }
-    }
-  });
-}
 
 async function enviar(jid, texto, mencoes = []) {
   try {
