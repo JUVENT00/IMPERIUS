@@ -77,11 +77,16 @@ async function conectar() {
   sock.ev.on('creds.update', saveCreds);
 
   sock.ev.on('connection.update', async ({ connection, lastDisconnect, qr }) => {
+    if (qr) {
+      const qrcode = require('qrcode-terminal');
+      qrcode.generate(qr, { small: true });
+      console.log('📱 QR CODE acima! Escaneie pelo WhatsApp.');
+    }
+
     if (connection === 'open') {
       console.log('✅ IMPERIUS RPG conectado ao WhatsApp!');
       tentativas_reconexao = 0;
     }
-
     if (connection === 'close') {
       const codigo = new Boom(lastDisconnect?.error)?.output?.statusCode;
       const deve_reconectar = codigo !== DisconnectReason.loggedOut;
