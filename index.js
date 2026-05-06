@@ -75,16 +75,34 @@ async function conectar() {
   });
 
   sock.ev.on('creds.update', saveCreds);
-if (!sock.authState.creds.registered) {
-  sock.ev.on('connection.update', ({ qr }) => {
-    if (qr) {
-      const qrcode = require('qrcode-terminal');
-      qrcode.generate(qr, { small: true });
-      console.log('📱 Escaneie o QR Code acima!');
-    }
-  });
-}
-  
+
+  if (!sock.authState.creds.registered) {
+    const express = require('express');
+    const qrcode = require('qrcode');
+    const app = express();
+    let qrAtual = '';
+
+    app.get('/', async (req, res) => {
+      if (!qrAtual) return res.send('<h2>Aguardando QR Code...</h2>');
+      const qrImg = await qrcode.toDataURL(qrAtual);
+      res.send(`<html><body style="display:flex;justify-content:center;align-items:center;height:100vh;background:#111">
+        <div style="text-align:center">
+          <h2 style="color:white">IMPERIUS RPG — Escaneie o QR Code</h2>
+          <img src="${qrImg}" style="width:300px"/>
+          <p style="color:gray">A página atualiza sozinha a cada 30s</p>
+        </div>
+      </body><script>setTimeout(()=>location.reload(),30000)</script></html>`);
+    });
+
+    app.listen(3000, () => console.log('🌐 QR disponível em: http://localhost:3000'));
+
+    sock.ev.on('connection.update', ({ qr }) => {
+      if (qr) {
+        qrAtual = qr;
+        console.log('📱 QR Code atualizado! Acesse a URL do Railway para escanear.');
+      }
+    });
+  }
 
   sock.ev.on('connection.update', async ({ connection, lastDisconnect }) => {
     if (connection === 'open') {
@@ -116,14 +134,16 @@ if (!sock.authState.creds.registered) {
 
   sock.ev.on('messages.upsert', async ({ messages, type }) => {
     if (type !== 'notify') return;
-
     for (const msg of messages) {
       if (msg.key.fromMe) continue;
-
       try {
         await processarMensagem(msg);
       } catch (err) {
         console.error('Erro ao processar mensagem:', err);
+      }
+    }
+  });
+}
       }
     }
   });
