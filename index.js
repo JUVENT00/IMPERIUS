@@ -351,7 +351,15 @@ async function processarMensagem(msg) {
   }
 
   // ── MUNDO ─────────────────────────────────────────────────
-  if (cmd === 'mapa') return enviar(jid, verMapa());
+  if (cmd === 'mapa') {
+
+  await sock.sendMessage(jid, {
+    image: fs.readFileSync('./mapa.jpg'),
+    caption: '🗺️ MAPA DO IMPERIUS'
+  });
+
+  return;
+}
   if (cmd === 'regioes') return enviar(jid, verRegioes());
 
   if (cmd === 'viajar') {
