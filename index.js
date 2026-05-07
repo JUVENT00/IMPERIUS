@@ -94,7 +94,13 @@ async function conectar() {
       </body><script>setTimeout(()=>location.reload(),30000)</script></html>`);
     });
 
-    app.listen(3000, () => console.log('🌐 QR disponível em: http://localhost:3000'));
+    const server = app.listen(3000, () => console.log('🌐 QR disponível em: http://localhost:3000'));
+server.on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    console.log('⚠️ Porta 3000 já em uso, tentando 3001...');
+    app.listen(3001);
+  }
+});
 
     sock.ev.on('connection.update', ({ qr }) => {
       if (qr) {
