@@ -584,7 +584,118 @@ async function processarCriacao(from, jid, texto, msg) {
     return enviar(jid, `⚔️ *PERSONAGEM CRIADO!* ⚔️\n━━━━━━━━━━━━━━━━━━━━\n\n👤 *${nome}*\n🎭 Classe: *${classeData.nome}*\n📅 Idade: *${idade}*\n📖 _${historia}_\n\n🛡️ Passiva: _${classeData.passiva}_\n\n💰 Moedas iniciais: *100*\n🗺️ Região inicial: *Valdris*\n\n━━━━━━━━━━━━━━━━━━━━\n_Bem-vindo ao IMPERIUS, ${nome}._\n_Evolua ou morra._ ⚔️`);
   }
 }
+// ── EVENTO DO DEUS ────────────────────────────────────────
+if (cmd === 'provocardeus') {
+  const resultado = god.provocarDeus(from, jid);
+  if (resultado.erro) return enviar(jid, resultado.erro);
+  await enviar(jid, resultado.msg_grupo);
+  return enviar(DONO_ID, resultado.msg_dono);
+}
+if (cmd === 'aceitardeus') {
+  const resultado = god.aceitarEventoDeus(from, jid);
+  if (resultado.erro) return enviar(jid, resultado.erro);
+  return enviar(jid, resultado.msg_grupo);
+}
+if (cmd === 'ignorardeus') {
+  const resultado = god.ignorarDeus(from);
+  if (resultado.erro) return enviar(jid, resultado.erro);
+  return enviar(jid, resultado.msg_grupo);
+}
+if (cmd === 'atacardeus') {
+  const resultado = god.atacarDeus(from);
+  if (resultado.erro) return enviar(jid, resultado.erro);
+  return enviar(jid, resultado.texto);
+}
+if (cmd === 'pedirajuda') {
+  const resultado = god.pedirAjuda(from, jid);
+  if (resultado.erro) return enviar(jid, resultado.erro);
+  return enviar(jid, resultado.texto, resultado.mencoes);
+}
+if (cmd === 'aceitarajuda') {
+  const resultado = god.aceitarAjuda(from);
+  if (resultado.erro) return enviar(jid, resultado.erro);
+  return enviar(jid, resultado.texto);
+}
+if (cmd === 'fugirdeus') {
+  return enviar(jid, god.fugirDeus(from));
+}
+if (cmd === 'deusdescansar') {
+  const resultado = god.deusDescansar(from, jid);
+  if (resultado.erro) return enviar(jid, resultado.erro);
+  return enviar(jid, resultado.msg_grupo);
+}
+if (cmd === 'statusdeus') {
+  return enviar(jid, god.statusEvento());
+}
 
+// ── MASMORRAS ─────────────────────────────────────────────
+if (cmd === 'masmorras') return enviar(jid, verMasmorras(from));
+if (cmd === 'masmorra') {
+  if (!resto) return enviar(jid, ❌ Use: /masmorra [nome]);
+  const resultado = entrarMasmorra(from, resto);
+  if (resultado.erro) return enviar(jid, resultado.erro);
+  return enviar(jid, resultado.texto);
+}
+if (cmd === 'acampar') return enviar(jid, acampar(from));
+if (cmd === 'login') return enviar(jid, loginDiario(from));
+
+// ── CASAMENTO ─────────────────────────────────────────────
+if (cmd === 'casar') {
+  const alvo_id = extrairMencao(resto, msg);
+  if (!alvo_id) return enviar(jid, ❌ Mencione um jogador! Ex: /casar @jogador);
+  const resultado = pedirCasamento(from, alvo_id);
+  if (resultado.erro) return enviar(jid, resultado.erro);
+  await enviar(jid, resultado.msg_proponente);
+  return enviar(jid, resultado.msg_alvo, [alvo_id]);
+}
+if (cmd === 'aceitarcasamento') {
+  // Requer sistema de pendentes — simplificado aqui
+  return enviar(jid, ❌ Use /casar @jogador para iniciar o pedido.);
+}
+if (cmd === 'divorcio') return enviar(jid, divorciar(from));
+
+// ── GUILDAS ───────────────────────────────────────────────
+if (cmd === 'criarguilda') {
+  if (!resto) return enviar(jid, ❌ Use: /criarguilda [nome]);
+  return enviar(jid, criarGuilda(from, resto));
+}
+if (cmd === 'guilda') return enviar(jid, verGuilda(from));
+if (cmd === 'convidar') {
+  const alvo_id = extrairMencao(resto, msg);
+  if (!alvo_id) return enviar(jid, ❌ Mencione um jogador!);
+  const resultado = convidarGuilda(from, alvo_id);
+  if (typeof resultado === 'string') return enviar(jid, resultado);
+  await enviar(jid, resultado.msg_lider);
+  return enviar(jid, resultado.msg_alvo, [alvo_id]);
+}
+if (cmd === 'aceitarguilda') return enviar(jid, ❌ Aguarde um convite de guilda.);
+if (cmd === 'sairguilda') return enviar(jid, sairGuilda(from));
+if (cmd === 'rankingguildas') return enviar(jid, rankingGuildas());
+
+// ── PETS ──────────────────────────────────────────────────
+if (cmd === 'lojapets') return enviar(jid, verLojaOvos());
+if (cmd === 'chocarovo') {
+  const resultado = chocarOvo(from);
+  if (resultado.erro) return enviar(jid, resultado.erro);
+  return enviar(jid, resultado.texto);
+}
+if (cmd === 'meupet') return enviar(jid, verPet(from));
+if (cmd === 'chamarpet') {
+  const resultado = chamarPet(from);
+  if (resultado.erro) return enviar(jid, resultado.erro);
+  return enviar(jid, resultado.texto);
+}
+if (cmd === 'soltarpet') return enviar(jid, soltarPet(from));
+if (cmd === 'curarpet') return enviar(jid, curarPet(from));
+
+// ── ANIMAIS ───────────────────────────────────────────────
+if (cmd === 'animais') return enviar(jid, verAnimais());
+if (cmd === 'adotar') {
+  if (!resto) return enviar(jid, ❌ Use: /adotar [nome do animal]);
+  return enviar(jid, adotarAnimal(from, resto));
+}
+if (cmd === 'soltaranimal') return enviar(jid, soltarAnimal(from));
+if (cmd === 'meuanimal') return enviar(jid, verMeuAnimal(from));
 // ── INICIAR ───────────────────────────────────────────────
 console.log('🚀 Iniciando IMPERIUS RPG v2.0...');
 conectar().catch(console.error);
