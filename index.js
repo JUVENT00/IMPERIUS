@@ -696,6 +696,8 @@ if (cmd === 'adotar') {
 }
 if (cmd === 'soltaranimal') return enviar(jid, soltarAnimal(from));
 if (cmd === 'meuanimal') return enviar(jid, verMeuAnimal(from));
+
+}
 // ── INICIAR ───────────────────────────────────────────────
 console.log('🚀 Iniciando IMPERIUS RPG v2.0...');
 conectar().catch(console.error);
