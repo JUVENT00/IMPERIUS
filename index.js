@@ -282,6 +282,7 @@ async function enviar(jid, texto, mencoes = []) {
 async function processarMensagem(msg) {
   const jid = msg.key.remoteJid;
   const from = msg.key.participant || msg.key.remoteJid;
+console.log('FROM:', from, 'DONO:', DONO_NUMERO);
   const isGrupo = jid.endsWith('@g.us');
   if (!isGrupo) return;
 
