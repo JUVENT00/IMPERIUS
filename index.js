@@ -230,8 +230,10 @@ async function conectar() {
       res.send(`<html><body style="display:flex;justify-content:center;align-items:center;height:100vh;background:#111"><div style="text-align:center"><h2 style="color:white">IMPERIUS — Escaneie o QR Code</h2><img src="${qrImg}" style="width:300px"/><p style="color:gray">Atualiza a cada 30s</p></div></body><script>setTimeout(()=>location.reload(),30000)</script></html>`);
     });
 
-    const server = app.listen(3001, () => console.log('🌐 QR disponível na URL do Railway'));
-    server.on('error', (err) => { if (err.code === 'EADDRINUSE') app.listen(3001); });
+    if (!global.qrServerStarted) {
+  global.qrServerStarted = true;
+  app.listen(3001, () => console.log('🌐 QR disponível na URL do Railway'));
+}
 
     sock.ev.on('connection.update', ({ qr }) => {
       if (qr) { qrAtual = qr; console.log('📱 QR Code atualizado!'); }
