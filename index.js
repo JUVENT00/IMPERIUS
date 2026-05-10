@@ -8,14 +8,14 @@ const qrcode = require('qrcode');
 
 const AUTH_DIR = path.join(__dirname, 'auth_info_baileys');
 const DONO_NUMERO = '5567998161300';
+const DONO_LID = '36821174120703';
 
 function isDono(from) {
   const num = from
     .replace('@s.whatsapp.net', '')
     .replace('@lid', '')
     .split(':')[0];
-  console.log('Verificando Dono:', num, '===', DONO_NUMERO, '?', num === DONO_NUMERO);
-  return num === DONO_NUMERO;
+  return num === DONO_NUMERO || num === DONO_LID;
 }
 
 async function conectar() {
@@ -59,11 +59,6 @@ async function conectar() {
       const jid = msg.key.remoteJid;
       const from = msg.key.participant || msg.key.remoteJid;
       const texto = msg.message?.conversation || msg.message?.extendedTextMessage?.text || '';
-
-      // Log sempre
-      console.log('FROM:', from);
-      console.log('DONO:', DONO_NUMERO);
-      console.log('É DONO?', isDono(from));
 
       if (!texto.startsWith('/')) return;
       const cmd = texto.slice(1).trim().toLowerCase();
