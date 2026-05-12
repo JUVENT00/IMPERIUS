@@ -1,0 +1,38 @@
+<svg width="600" height="100" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <style>
+      .title {
+        font-family: 'Georgia', serif;
+        font-size: 48px;
+        font-weight: bold;
+        fill: #FFD700;
+        filter: url(#glow);
+      }
+      .sub {
+        font-family: 'Georgia', serif;
+        font-size: 16px;
+        fill: #C0A040;
+      }
+      @keyframes flicker {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.6; }
+      }
+      @keyframes appear {
+        0% { opacity: 0; letter-spacing: 20px; }
+        100% { opacity: 1; letter-spacing: 4px; }
+      }
+      .title { animation: appear 2s ease forwards, flicker 4s ease-in-out 2s infinite; }
+      .sub { animation: appear 3s ease forwards; opacity: 0; }
+    </style>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  <rect width="600" height="100" fill="#0a0a0a" rx="10"/>
+  <text x="300" y="60" text-anchor="middle" class="title">⚔️ IMPERIUS</text>
+  <text x="300" y="85" text-anchor="middle" class="sub">— Evolua ou morra —</text>
+</svg>
