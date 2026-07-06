@@ -4,13 +4,16 @@
 const { getJogador, salvarJogador, adicionarConquista, adicionarTitulo, getPendente, setPendente, deletePendente } = require('./db');
 const { CLASSES } = require('./gameData');
 
-function renascer(jogador_id) {
+const COOLDOWN_SUICIDIO = 3 * 60 * 1000; // 3 minutos em ms
+
+function renascer(jogador_id, novo_nome) {
   const jogador = getJogador(jogador_id);
   if (!jogador) return '❌ Personagem não encontrado.';
   if (!jogador.morto) return '❌ Você não está morto!';
 
   const classeData = CLASSES[jogador.classe];
   jogador.morto = false;
+  if (novo_nome) jogador.nome = novo_nome;
   jogador.hp_max = Math.floor((classeData?.hp || 100) * 0.5);
   jogador.mana = Math.floor((classeData?.mana || 100) * 0.5);
   jogador.servo_de = null;
@@ -27,6 +30,29 @@ function renascer(jogador_id) {
   salvarJogador(jogador_id, jogador);
 
   return `☀️ *${jogador.nome} RENASCEU!*\n\n⚠️ Você perdeu:\n• 30% do XP\n• 50% das moedas\n• Todos os itens e arma\n\nVocê está de volta em *Valdris*.\n\n_Evolua ou morra._`;
+}
+
+function suicidar(jogador_id) {
+  const jogador = getJogador(jogador_id);
+  if (!jogador) return '❌ Personagem não encontrado.';
+  if (jogador.morto) return '❌ Você já está morto!';
+
+  const agora = Date.now();
+  const ultimo = jogador.ultimo_suicidio || 0;
+  const restante = COOLDOWN_SUICIDIO - (agora - ultimo);
+
+  if (restante > 0) {
+    const min = Math.ceil(restante / 60000);
+    return `⏳ Espere *${min} minuto(s)* para usar de novo.`;
+  }
+
+  jogador.morto = true;
+  jogador.ultimo_suicidio = agora;
+  jogador.hp = 0;
+
+  salvarJogador(jogador_id, jogador);
+
+  return `💀 *${jogador.nome}* tirou a própria vida.\n\nUse /renascer para recomeçar.`;
 }
 
 function reviverPorNecromante(necromante_id, alvo_id) {
@@ -98,4 +124,4 @@ function liberarServo(servo_id) {
   return `🔓 *${servo.nome}* se libertou de *${mestre}*!\n🏆 Conquista: *Servo Liberto*`;
 }
 
-module.exports = { renascer, reviverPorNecromante, aprovarAcaoServo, registrarAcaoServo, liberarServo };
+module.exports = { renascer, suicidar, reviverPorNecromante, aprovarAcaoServo, registrarAcaoServo, liberarServo };
