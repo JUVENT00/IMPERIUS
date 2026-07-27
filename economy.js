@@ -1,0 +1,476 @@
+// ============================================================
+// IMPERIUS RPG — ECONOMIA
+// ============================================================
+const { getJogador, salvarJogador, adicionarMoedas, adicionarXP, adicionarConquista, formatarBelarium, formatarPreco } = require('./db');
+const { ITENS_LOJA, ARMAS, ARMADURAS, REGIOES } = require('./gameData');
+
+function rand(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
+
+// Cada nome de arma/armadura tem várias variações de raridade (a mesma
+// "Espada Ancestral" existe de Comum até Relâmpago Divino, por ex). Listar
+// todas as 18 variações com o nome idêntico deixava a loja parecendo cheia
+// de itens duplicados. Aqui agrupamos por nome e mostramos só a versão mais
+// barata (a "de entrada"), indicando onde ver as outras raridades.
+function agruparPorNomeMaisBarato(lista) {
+  const porNome = new Map();
+  lista.forEach(a => {
+    const atual = porNome.get(a.nome);
+    if (!atual || a.preco < atual.preco) porNome.set(a.nome, a);
+  });
+  return [...porNome.values()];
+}
+
+function verLoja() {
+  let texto = `🛒 *LOJA DE VALDRIS* 🛒\n━━━━━━━━━━━━━━━━━━━━\n\n`;
+
+  texto += `⚔️ *ARMAS* (versão de entrada — cada uma tem outras raridades):\n`;
+  const armas_compraveis = agruparPorNomeMaisBarato(ARMAS.filter(a => !a.exclusiva && a.preco > 0));
+  armas_compraveis.forEach(a => {
+    texto += `• *${a.nome}* — 💰 ${a.preco} | Dano: ${a.dano[0]}-${a.dano[1]} | ${a.raridade}\n`;
+  });
+  texto += `🔍 Use */buscararma [nome ou raridade]* pra ver as outras raridades de cada arma.\n`;
+
+  texto += `\n🛡️ *ARMADURAS:*\n`;
+  agruparPorNomeMaisBarato(ARMADURAS.filter(a => a.preco > 0)).forEach(a => {
+    texto += `• *${a.nome}* — 💰 ${a.preco} | Defesa: +${a.defesa} | ${a.raridade}\n`;
+  });
+
+  texto += `\n🧪 *ITENS:*\n`;
+  ITENS_LOJA.filter(i => i.preco > 0).forEach(i => {
+    texto += `• *${i.nome}* — 💰 ${i.preco}\n`;
+  });
+
+  texto += `\n📝 Use */comprar [nome do item/arma/armadura]*\n💡 Pra armas com várias raridades, inclua a raridade na busca (ex: */comprar Espada Ancestral épico*)`;
+  return texto;
+}
+
+function normalizarTexto(t) {
+  return (t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+
+const STOPWORDS = new Set(['de', 'da', 'do', 'das', 'dos', 'e', 'a', 'o', 'os', 'as']);
+function palavrasSignificativas(t) {
+  return normalizarTexto(t).replace(/[^\w\s]/g, ' ').split(/\s+/).filter(w => w && !STOPWORDS.has(w));
+}
+
+// Busca tolerante: aceita substring direto OU todas as palavras-chave da busca
+// presentes no nome, em qualquer ordem (ex: "pocao maxima" acha "Poção de HP Máxima")
+function matchTexto(busca, alvo) {
+  const b = normalizarTexto(busca);
+  const a = normalizarTexto(alvo);
+  if (!b) return false;
+  if (a.includes(b)) return true;
+  const palavrasBusca = palavrasSignificativas(busca);
+  if (palavrasBusca.length === 0) return false;
+  const palavrasAlvo = new Set(palavrasSignificativas(alvo));
+  return palavrasBusca.every(p => palavrasAlvo.has(p));
+}
+
+// Tira o emoji/símbolo da raridade, deixando só a palavra pra comparar
+// (ex: "🟪 Épico" -> "epico").
+function raridadeNormalizada(raridade) {
+  return normalizarTexto(raridade).replace(/[^a-z0-9\s]/gi, '').trim();
+}
+
+// Busca por nome que também entende raridade na frase de busca — resolve o
+// bug de "a loja mostra um dano alto mas ao comprar vem um item fraco":
+// várias raridades da mesma arma compartilham o nome exibido, então a busca
+// por nome sozinha sempre batia com a PRIMEIRA (mais fraca/barata) do array.
+// Agora, se a busca incluir a raridade (ex: "espada ancestral epico"), filtra
+// por ela; se ficar ambíguo sem raridade, devolve as opções em vez de
+// escolher uma sozinha.
+function limparNome(texto) {
+  return normalizarTexto(texto).replace(/[^a-z0-9\s]/gi, '').replace(/\s+/g, ' ').trim();
+}
+
+function buscarPorNomeERaridade(lista, busca) {
+  const buscaNorm = limparNome(busca);
+
+  // Primeiro acha o NOME do item que bate com a busca (o nome mais longo/
+  // específico que for substring, pra "espada ancestral" não bater só em
+  // "espada"). Só depois olha o que sobrou da busca como possível raridade —
+  // assim uma arma cujo nome já contenha a palavra de uma raridade (ex:
+  // "Espada Ancestral" vs a raridade "Ancestral") não é confundida. Os nomes
+  // têm emoji na frente (ex: "🗡️ Espada Ancestral") que o jogador nunca
+  // digita, então comparamos sempre pela versão sem símbolos.
+  const nomesUnicos = [...new Set(lista.map(a => a.nome))];
+  const nomesQueBatem = nomesUnicos
+    .filter(nome => buscaNorm.includes(limparNome(nome)))
+    .sort((a, b) => b.length - a.length);
+
+  let candidatos, leftover;
+  if (nomesQueBatem.length > 0) {
+    const nomeEscolhido = nomesQueBatem[0];
+    leftover = buscaNorm.replace(limparNome(nomeEscolhido), '').trim();
+    candidatos = lista.filter(a => a.nome === nomeEscolhido);
+  } else {
+    candidatos = lista.filter(a => limparNome(a.nome).includes(buscaNorm) || normalizarTexto(a.id).includes(normalizarTexto(busca)));
+    leftover = '';
+  }
+
+  if (candidatos.length === 0) return { item: null, ambiguo: null };
+
+  if (leftover) {
+    const filtrados = candidatos.filter(a => raridadeNormalizada(a.raridade).includes(leftover) || leftover.includes(raridadeNormalizada(a.raridade)));
+    if (filtrados.length) candidatos = filtrados;
+  }
+
+  const nomesRestantes = new Set(candidatos.map(a => a.nome));
+  // Ambíguo de verdade: mais de um item com o MESMO nome e nenhuma raridade
+  // informada pra desempatar.
+  if (candidatos.length > 1 && nomesRestantes.size === 1 && !leftover) {
+    return { item: null, ambiguo: candidatos };
+  }
+
+  candidatos.sort((a, b) => a.preco - b.preco);
+  return { item: candidatos[0], ambiguo: null };
+}
+
+function mensagemAmbiguidade(candidatos, busca) {
+  const linhas = candidatos
+    .sort((a, b) => a.preco - b.preco)
+    .map(a => `• *${a.nome}* ${a.raridade} — 💰 ${a.preco} | Dano: ${a.dano ? `${a.dano[0]}-${a.dano[1]}` : '-'}${a.defesa ? ` | Defesa: +${a.defesa}` : ''}`);
+  return [
+    `❓ *"${busca}"* tem várias raridades disponíveis:`,
+    ...linhas,
+    '',
+    '📝 Inclua a raridade na busca pra escolher, ex:',
+    `*/comprar ${busca} ${candidatos[0].raridade.replace(/^[^\w]+/, '').trim()}*`
+  ].join('\n');
+}
+
+function comprarItem(jogador_id, item_nome) {
+  const jogador = getJogador(jogador_id);
+  if (!jogador) return '❌ Personagem não encontrado.';
+  if (jogador.morto) return '💀 Mortos não compram.';
+
+  const busca = normalizarTexto(item_nome);
+  const item = ITENS_LOJA.find(i => i.preco > 0 && (normalizarTexto(i.nome).includes(busca) || normalizarTexto(i.id).includes(busca)));
+
+  let arma = null;
+  let armadura = null;
+
+  if (!item) {
+    const resultadoArma = buscarPorNomeERaridade(ARMAS.filter(a => !a.exclusiva && a.preco > 0), item_nome);
+    if (resultadoArma.ambiguo) return mensagemAmbiguidade(resultadoArma.ambiguo, item_nome);
+    arma = resultadoArma.item;
+
+    if (!arma) {
+      const resultadoArmadura = buscarPorNomeERaridade(ARMADURAS.filter(a => a.preco > 0), item_nome);
+      if (resultadoArmadura.ambiguo) return mensagemAmbiguidade(resultadoArmadura.ambiguo, item_nome);
+      armadura = resultadoArmadura.item;
+    }
+  }
+
+  const alvo = item || arma || armadura;
+  if (!alvo) return `❌ Item *${item_nome}* não encontrado. Use /loja para ver os itens.`;
+
+  if (jogador.moedas < alvo.preco) return `❌ Belarium insuficiente! Você tem ${formatarBelarium(jogador)}, precisa de ${formatarPreco(alvo.preco)}.`;
+
+  jogador.moedas -= alvo.preco;
+
+  if (arma) {
+    if (!jogador.inventario) jogador.inventario = [];
+    jogador.inventario.push(arma.id);
+    salvarJogador(jogador_id, jogador);
+    adicionarConquista(jogador_id, 'comprador');
+    if (jogador.moedas >= 1000) adicionarConquista(jogador_id, 'rico');
+    return `✅ *${arma.nome}* comprada!\n💰 Belarium restante: ${formatarBelarium(jogador)}\nUse */equipar ${arma.nome}* para equipar.`;
+  }
+
+  if (armadura) {
+    if (!jogador.inventario) jogador.inventario = [];
+    jogador.inventario.push(armadura.id);
+    salvarJogador(jogador_id, jogador);
+    adicionarConquista(jogador_id, 'comprador');
+    if (jogador.moedas >= 1000) adicionarConquista(jogador_id, 'rico');
+    return `✅ *${armadura.nome}* comprada!\n💰 Belarium restante: ${formatarBelarium(jogador)}\nUse */equiparmadura ${armadura.nome}* para equipar.`;
+  }
+
+  if (!jogador.inventario) jogador.inventario = [];
+  jogador.inventario.push(item.id);
+  salvarJogador(jogador_id, jogador);
+
+  adicionarConquista(jogador_id, 'comprador');
+  if (jogador.moedas >= 1000) adicionarConquista(jogador_id, 'rico');
+
+  return `✅ *${item.nome}* comprado!\n💰 Belarium restante: ${formatarBelarium(jogador)}\nUse */usar ${item.id}* para usar.`;
+}
+
+function usarItem(jogador_id, item_id) {
+  const jogador = getJogador(jogador_id);
+  if (!jogador) return '❌ Personagem não encontrado.';
+  if (jogador.morto) return '💀 Mortos não usam itens.';
+
+  const busca = normalizarTexto(item_id);
+  const idx = jogador.inventario?.findIndex(i => {
+    if (normalizarTexto(i).includes(busca)) return true;
+    const item_lookup = ITENS_LOJA.find(x => x.id === i);
+    return item_lookup && normalizarTexto(item_lookup.nome).includes(busca);
+  });
+  if (idx === -1 || idx === undefined) return '❌ Item não encontrado no inventário.';
+
+  const item_key = jogador.inventario[idx];
+  const item = ITENS_LOJA.find(i => i.id === item_key);
+  if (!item) return '❌ Item inválido.';
+
+  // Bônus Alquimista
+  const mult = jogador.classe === 'alquimista' ? 2 : 1;
+
+  jogador.inventario.splice(idx, 1);
+
+  switch (item.efeito) {
+    case 'curar':
+      const cura = item.valor * mult;
+      jogador.hp = Math.min(jogador.hp_max, jogador.hp + cura);
+      salvarJogador(jogador_id, jogador);
+      return `💚 *${item.nome}* usado! +${cura} HP\nHP atual: *${jogador.hp}/${jogador.hp_max}*`;
+
+    case 'mana':
+      const mana_rec = item.valor * mult;
+      jogador.mana = Math.min(jogador.mana_max || 100, (jogador.mana || 0) + mana_rec);
+      salvarJogador(jogador_id, jogador);
+      return `💧 *${item.nome}* usado! +${mana_rec} Mana\nMana atual: *${jogador.mana}*`;
+
+    case 'curar_total':
+      jogador.hp = jogador.hp_max;
+      salvarJogador(jogador_id, jogador);
+      return `💚 *${item.nome}* usado! HP totalmente restaurado!\nHP atual: *${jogador.hp}/${jogador.hp_max}*`;
+
+    case 'mana_total':
+      jogador.mana = jogador.mana_max || jogador.mana;
+      salvarJogador(jogador_id, jogador);
+      return `💧 *${item.nome}* usado! Mana totalmente restaurada!\nMana atual: *${jogador.mana}*`;
+
+    case 'curar_sangramento':
+      jogador.status_negativos = (jogador.status_negativos || []).filter(s => s !== 'sangramento' && s !== 'envenenado');
+      salvarJogador(jogador_id, jogador);
+      return `🩹 *${item.nome}* usado! Status negativos removidos.`;
+
+    case 'purificar':
+      jogador.status_negativos = [];
+      salvarJogador(jogador_id, jogador);
+      return `✨ *${item.nome}* usado! Purificado completamente.`;
+
+    case 'xp':
+      const xp_val = item.valor * mult;
+      salvarJogador(jogador_id, jogador); // persiste a remoção do item no inventário primeiro
+      adicionarXP(jogador_id, xp_val);    // só então aplica o XP (senão o salvamento acima sobrescrevia o ganho)
+      return `📚 *${item.nome}* usado! +${xp_val} XP`;
+
+    case 'ressurreicao':
+      jogador.morto = false;
+      jogador.hp = Math.max(1, Math.floor(jogador.hp - (jogador.hp * 0.1)));
+      salvarJogador(jogador_id, jogador);
+      return `💎 *Pedra de Ressurreição* usada! Você voltou com 80% do HP!`;
+
+    case 'buff_for': {
+      const ganho_for = item.valor * mult;
+      jogador.for = (jogador.for || 10) + ganho_for;
+      salvarJogador(jogador_id, jogador);
+      return `💪 *${item.nome}* usado! Força permanente +${ganho_for}\nForça atual: *${jogador.for}*`;
+    }
+
+    case 'buff_sorte': {
+      const duracao = item.duracao || 5;
+      jogador.sorte_valor = item.valor * mult;
+      jogador.sorte_batalhas_restantes = duracao;
+      salvarJogador(jogador_id, jogador);
+      return `🍀 *${item.nome}* usado! Sorte aumentada nas próximas *${duracao}* batalhas.`;
+    }
+
+    case 'teletransporte': {
+      const regioes_ids = Object.keys(REGIOES).filter(r => r !== jogador.regiao);
+      if (regioes_ids.length === 0) {
+        salvarJogador(jogador_id, jogador);
+        return `📜 *${item.nome}* usado, mas não há outra região para onde ir.`;
+      }
+      const destino = regioes_ids[Math.floor(Math.random() * regioes_ids.length)];
+      jogador.regiao = destino;
+      salvarJogador(jogador_id, jogador);
+      return `📜 *${item.nome}* usado! Você foi teletransportado para *${REGIOES[destino].nome}*.`;
+    }
+
+    case 'nivel_up': {
+      const xp_faltante = Math.max(1, (jogador.xp_proximo || 100) - (jogador.xp || 0));
+      salvarJogador(jogador_id, jogador); // persiste a remoção do item antes de aplicar XP
+      adicionarXP(jogador_id, xp_faltante);
+      return `⭐ *${item.nome}* usado! Você subiu de nível instantaneamente!`;
+    }
+
+    default:
+      salvarJogador(jogador_id, jogador);
+      return `✅ *${item.nome}* usado!`;
+  }
+}
+
+function equiparArma(jogador_id, arma_busca) {
+  const jogador = getJogador(jogador_id);
+  if (!jogador) return '❌ Personagem não encontrado.';
+
+  const busca = normalizarTexto(arma_busca);
+  // Antes pegava a PRIMEIRA arma do inventário que batesse com o nome — como
+  // várias raridades diferentes podem ter o mesmo nome (ex: "Espada Titânico"
+  // existe em Comum e em Épico), isso podia equipar a versão errada (mais fraca).
+  // Agora junta TODAS que batem e escolhe a de maior dano.
+  const candidatas = (jogador.inventario || [])
+    .filter(i => normalizarTexto(i).includes(busca) || (() => {
+      const armaData = ARMAS.find(a => a.id === i);
+      return armaData && normalizarTexto(armaData.nome).includes(busca);
+    })())
+    .map(i => ({ id: i, data: ARMAS.find(a => a.id === i) }))
+    .filter(x => x.data);
+
+  if (!candidatas.length) return '❌ Você não possui esta arma no inventário.';
+
+  candidatas.sort((a, b) => b.data.dano[1] - a.data.dano[1]);
+  const { id: tem, data: armaData } = candidatas[0];
+
+  jogador.arma = tem;
+  salvarJogador(jogador_id, jogador);
+
+  return `⚔️ *${armaData.nome}* equipada!\nDano: *${armaData.dano[0]}-${armaData.dano[1]}* | ${armaData.raridade}`;
+}
+
+function equiparArmadura(jogador_id, armadura_busca) {
+  const jogador = getJogador(jogador_id);
+  if (!jogador) return '❌ Personagem não encontrado.';
+
+  const busca = normalizarTexto(armadura_busca);
+  const candidatas = (jogador.inventario || [])
+    .filter(i => normalizarTexto(i).includes(busca) || (() => {
+      const armaduraData = ARMADURAS.find(a => a.id === i);
+      return armaduraData && normalizarTexto(armaduraData.nome).includes(busca);
+    })())
+    .map(i => ({ id: i, data: ARMADURAS.find(a => a.id === i) }))
+    .filter(x => x.data);
+
+  if (!candidatas.length) return '❌ Você não possui esta armadura no inventário.';
+
+  candidatas.sort((a, b) => b.data.defesa - a.data.defesa);
+  const { id: tem, data: armaduraData } = candidatas[0];
+
+  jogador.armadura = tem;
+  salvarJogador(jogador_id, jogador);
+
+  return `🛡️ *${armaduraData.nome}* equipada!\nDefesa: *+${armaduraData.defesa}* | ${armaduraData.raridade}`;
+}
+
+// ── VENDER ITEM (converte itens/troféus do inventário em Belarium) ──
+const VALOR_TROFEU_MIN = 10;
+const VALOR_TROFEU_MAX = 35;
+
+function venderItem(jogador_id, item_nome) {
+  const jogador = getJogador(jogador_id);
+  if (!jogador) return '❌ Personagem não encontrado.';
+  if (!jogador.inventario || jogador.inventario.length === 0) return '❌ Seu inventário está vazio.';
+
+  const busca = normalizarTexto(item_nome);
+  const idx = jogador.inventario.findIndex(i => {
+    if (normalizarTexto(i).includes(busca)) return true;
+    const item_lookup = ITENS_LOJA.find(x => x.id === i);
+    if (item_lookup && normalizarTexto(item_lookup.nome).includes(busca)) return true;
+    const arma_lookup = ARMAS.find(x => x.id === i);
+    if (arma_lookup && normalizarTexto(arma_lookup.nome).includes(busca)) return true;
+    const armadura_lookup = ARMADURAS.find(x => x.id === i);
+    if (armadura_lookup && normalizarTexto(armadura_lookup.nome).includes(busca)) return true;
+    return false;
+  });
+
+  if (idx === -1) return '❌ Item não encontrado no inventário. Use /inventario para ver o que você tem.';
+
+  const item_key = jogador.inventario[idx];
+  const item = ITENS_LOJA.find(i => i.id === item_key);
+  const arma = ARMAS.find(a => a.id === item_key);
+  const armadura = ARMADURAS.find(a => a.id === item_key);
+
+  let valor = 0;
+  let nome_exibido = item_key;
+
+  if (arma && jogador.arma === item_key) return '❌ Você não pode vender a arma equipada! Equipe outra antes com /equipar.';
+  if (armadura && jogador.armadura === item_key) return '❌ Você não pode vender a armadura equipada! Equipe outra antes com /equiparmadura.';
+
+  if (item) { valor = Math.max(5, Math.floor((item.preco || 20) * 0.4)); nome_exibido = item.nome; }
+  else if (arma) { valor = Math.max(10, Math.floor((arma.preco || 50) * 0.4)); nome_exibido = arma.nome; }
+  else if (armadura) { valor = Math.max(10, Math.floor((armadura.preco || 50) * 0.4)); nome_exibido = armadura.nome; }
+  else { valor = rand(VALOR_TROFEU_MIN, VALOR_TROFEU_MAX); nome_exibido = item_key; }
+
+  jogador.inventario.splice(idx, 1);
+  jogador.moedas = (jogador.moedas || 0) + valor;
+  salvarJogador(jogador_id, jogador);
+
+  return `💰 *${nome_exibido}* vendido por *${valor}* 🥉 Bronze!\n💰 Belarium atual: ${formatarBelarium(jogador)}`;
+}
+
+function verInventario(jogador_id) {
+  const jogador = getJogador(jogador_id);
+  if (!jogador) return '❌ Personagem não encontrado.';
+
+  const armaAtual = ARMAS.find(a => a.id === jogador.arma);
+  const armaduraAtual = ARMADURAS.find(a => a.id === jogador.armadura);
+  let texto = `🎒 *INVENTÁRIO DE ${jogador.nome.toUpperCase()}*\n━━━━━━━━━━━━━━━━━━━━\n\n`;
+  texto += `⚔️ Arma equipada: *${armaAtual?.nome || 'Nenhuma'}*\n`;
+  if (armaAtual) texto += `   Dano: ${armaAtual.dano[0]}-${armaAtual.dano[1]} | ${armaAtual.raridade}\n`;
+  texto += `🛡️ Armadura equipada: *${armaduraAtual?.nome || 'Nenhuma'}*\n`;
+  if (armaduraAtual) texto += `   Defesa: +${armaduraAtual.defesa} | ${armaduraAtual.raridade}\n`;
+  texto += `💰 Belarium: ${formatarBelarium(jogador)}\n\n`;
+
+  if (!jogador.inventario || jogador.inventario.length === 0) {
+    texto += `_Inventário vazio._`;
+  } else {
+    texto += `📦 *ITENS:*\n`;
+    const contagem = {};
+    jogador.inventario.forEach(item_id => {
+      contagem[item_id] = (contagem[item_id] || 0) + 1;
+    });
+    Object.entries(contagem).forEach(([item_id, qtd], i) => {
+      const item = ITENS_LOJA.find(x => x.id === item_id);
+      const arma = ARMAS.find(a => a.id === item_id);
+      const armadura = ARMADURAS.find(a => a.id === item_id);
+      const nome = item?.nome || arma?.nome || armadura?.nome || item_id;
+      texto += `${i + 1}. ${nome}${qtd > 1 ? ` x${qtd}` : ''}\n`;
+    });
+    texto += `\n📝 */equipar [arma]* | */equiparmadura [armadura]* | */vender [item]*`;
+  }
+
+  if (jogador.poder_especial) {
+    texto += `\n⚡ *PODER ESPECIAL:*\n_${jogador.poder_especial}_`;
+  }
+
+  return texto;
+}
+
+function verBanco(jogador_id) {
+  const jogador = getJogador(jogador_id);
+  if (!jogador) return '❌ Personagem não encontrado.';
+
+  return `🏦 *BANCO DE VALDRIS*\n━━━━━━━━━━━━━━━━━━━━\n\n👤 *${jogador.nome}*\n\n💰 Carteira: ${formatarBelarium(jogador)}\n🏦 Banco: *${jogador.banco || 0}* 🥉 Bronze\n\n📝 */depositar [valor]* — Depositar\n📝 */sacar [valor]* — Sacar`;
+}
+
+function depositar(jogador_id, valor) {
+  const jogador = getJogador(jogador_id);
+  if (!jogador) return '❌ Personagem não encontrado.';
+  if (isNaN(valor) || valor <= 0) return '❌ Valor inválido.';
+  if (jogador.moedas < valor) return `❌ Você não tem *${valor}* moedas na carteira.`;
+
+  jogador.moedas -= valor;
+  jogador.banco = (jogador.banco || 0) + valor;
+  salvarJogador(jogador_id, jogador);
+
+  return `🏦 Depositado *${valor}* 🥉 Bronze!\n💰 Carteira: ${formatarBelarium(jogador)} | Banco: *${jogador.banco}* 🥉 Bronze`;
+}
+
+function sacar(jogador_id, valor) {
+  const jogador = getJogador(jogador_id);
+  if (!jogador) return '❌ Personagem não encontrado.';
+  if (isNaN(valor) || valor <= 0) return '❌ Valor inválido.';
+  if ((jogador.banco || 0) < valor) return `❌ Você não tem *${valor}* moedas no banco.`;
+
+  jogador.banco -= valor;
+  jogador.moedas += valor;
+  salvarJogador(jogador_id, jogador);
+
+  return `💰 Sacado *${valor}* 🥉 Bronze!\n💰 Carteira: ${formatarBelarium(jogador)} | Banco: *${jogador.banco}* 🥉 Bronze`;
+}
+
+module.exports = { verLoja, comprarItem, usarItem, equiparArma, equiparArmadura, venderItem, verInventario, verBanco, depositar, sacar };
